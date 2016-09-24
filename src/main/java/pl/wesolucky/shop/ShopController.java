@@ -1,6 +1,5 @@
 package pl.wesolucky.shop;
 
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -21,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import pl.wesolucky.shop.domain.FailureMessage;
 import pl.wesolucky.shop.domain.Shop;
 import pl.wesolucky.shop.domain.ShopDTO;
-import pl.wesolucky.shop.presta.PrestaSchemaDAO;
+import pl.wesolucky.shop.presta.PrestaMySqlDAO;
 
 
 @RestController
@@ -32,21 +31,21 @@ public class ShopController
 	@Inject
 	private ShopRepository shopRepository;
 	
-	private final PrestaSchemaDAO prestaSchemaDAO = new PrestaSchemaDAO();
+	private final PrestaMySqlDAO prestaMySqlDAO = new PrestaMySqlDAO();
 	private final Logger log = LoggerFactory.getLogger(ShopController.class);
 	
 	
     /**
-     * POST  /shops : Create a new shop.
+     * POST  /shops : Creates a new shop.
      *
-     * @param shop the shop to create
-     * @return the ResponseEntity with status 201 (Created) and with body the new shop, or with status 400 (Bad Request) if the shop has already an ID
-     * @throws URISyntaxException if the Location URI syntax is incorrect
+     * @param shop The shop to create
+     * @return The ResponseEntity with status 201 (Created) and body with the new shop, 
+     * or with status 400 (Bad Request) if the shop has already an ID
      */
     @RequestMapping(value = "/shops",
     				method = RequestMethod.POST,
     				produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Object> createShop(@RequestBody Shop shop) throws URISyntaxException 
+    public ResponseEntity<Object> createShop(@RequestBody Shop shop) 
     {
         log.info("REST request to save Shop : {}", shop);
         String failureMsg = "";
@@ -60,7 +59,7 @@ public class ShopController
         shop.setBaseUrl(baseUrl);
         
         // check MySQL connection by list tables
-        failureMsg = prestaSchemaDAO.checkTables(shop);
+        failureMsg = prestaMySqlDAO.checkTables(shop);
         if (!failureMsg.equals(""))
         {
         	failureMsg = "MySQL connection failed. " + failureMsg;
@@ -76,13 +75,12 @@ public class ShopController
      * @param shop the shop to update
      * @return the ResponseEntity with status 200 (OK) and with body the updated shop,
      * or with status 400 (Bad Request) if the shop is not valid,
-     * or with status 500 (Internal Server Error) if the shop couldnt be updated
-     * @throws URISyntaxException if the Location URI syntax is incorrect
+     * or with status 500 (Internal Server Error) if the shop couldn't be updated
      */
     @RequestMapping(value = "/shops",
     				method = RequestMethod.PUT,
     				produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Object> updateShop(@RequestBody Shop shop) throws URISyntaxException 
+    public ResponseEntity<Object> updateShop(@RequestBody Shop shop)
     {
         log.info("REST request to update Shop : {}", shop);
         String failureMsg = "";
@@ -98,8 +96,8 @@ public class ShopController
         String baseUrl = shop.isHttpsEnabled() ? "https://" + shop.getDomain() : "http://" + shop.getDomain();
         shop.setBaseUrl(baseUrl);
         
-        // check MySQL connection by list tables
-        failureMsg = prestaSchemaDAO.checkTables(shop);
+        // check MySQL connection by list of tables
+        failureMsg = prestaMySqlDAO.checkTables(shop);
         if (!failureMsg.equals(""))
         {
         	failureMsg = "MySQL connection failed. " + failureMsg;
@@ -111,15 +109,15 @@ public class ShopController
     }
     
     /**
-     * DELETE  /shops/:id : delete shop by id.
+     * DELETE  /shops/:id : deletes shop by id.
      *
-     * @param id the id of the shop to delete
-     * @return the ResponseEntity with status 200 (OK) and with the deleted shop data in body, or failure message 400 (Bad request)
+     * @param id The id of the shop to delete
+     * @return The ResponseEntity with status 200 (OK) and with the deleted shop data in body, or failure message 400 (Bad request)
      */
     @RequestMapping(value = "/shops/{id}",
 			method = RequestMethod.DELETE,
 			produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<Object> deletShop(@PathVariable Long id) throws URISyntaxException 
+	public ResponseEntity<Object> deletShop(@PathVariable Long id)
 	{
         log.info("REST request to delete Shop : {}", id);
         String failureMsg = "";
@@ -135,7 +133,7 @@ public class ShopController
 	}
 
     /**
-     * GET  /shops : get all the shops DTO with base data (don't include MySQL connection parameters without reason).
+     * GET  /shops : gets all the shops DTO with base data (don't include MySQL connection parameters without reason).
      *
      * @return List<ShopDTO> 
      */
@@ -152,10 +150,10 @@ public class ShopController
     }
 
     /**
-     * GET  /shops/:id : get the shop by id.
+     * GET  /shops/:id : gets the shop by id.
      *
-     * @param id the id of the shop to retrieve
-     * @return the ResponseEntity with status 200 (OK) and with the shop in body, or with status 404 (Not Found)
+     * @param id The id of the shop to retrieve
+     * @return The ResponseEntity with status 200 (OK) and with the shop in body, or with status 404 (Not Found)
      */
     @RequestMapping(value = "/shops/{id}",
     				method = RequestMethod.GET,

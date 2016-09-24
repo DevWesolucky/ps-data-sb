@@ -9,6 +9,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import pl.wesolucky.shop.domain.PrestaProduct;
 import pl.wesolucky.shop.domain.PrestaProductImage;
 import pl.wesolucky.shop.domain.Shop;
@@ -31,14 +34,18 @@ public class PrestaMySqlParser
 	
 	private List<Integer[]> psProductAttributeImageList;
 	
-	
 	private Map<Integer, PrestaProduct> mainProductsMap;
 	private Map<Integer, PrestaProduct> attributeProductsMap;
 	private Map<String, PrestaProduct> realProductsMap;
 	
+	private final Logger log = LoggerFactory.getLogger(PrestaMySqlParser.class);
 	
-	
-	public void initCollections(Shop shop)
+	/**
+	 * Resets all collections before parse fresh data.
+	 * 
+	 * @param shop Selected shop
+	 */
+	public void resetCollections(Shop shop)
 	{
 		shop.setMySqlProductsList(new ArrayList<>());
 		
@@ -47,7 +54,13 @@ public class PrestaMySqlParser
 		realProductsMap = new HashMap<>();
 	}
 	
-	
+	/**
+	 * Parses result of query for particular table.
+	 * 
+	 * @param resultSet The query result
+	 * @param table The table
+	 * @param shop Selected shop
+	 */
 	public void parseResultSetForTable(ResultSet resultSet, String table, Shop shop)
 	{
 		
@@ -104,11 +117,10 @@ public class PrestaMySqlParser
 				parsePsStockAvailable(resultSet, shop);
 				validateCodesAndSetupRealProductsMap(shop);
 				
-				System.out.println(":: mainProductsMap.size(): " + mainProductsMap.size());
-				System.out.println(":: attributeProductsMap.size(): " + attributeProductsMap.size());
-				System.out.println(":: realProductsMap.size(): " + realProductsMap.size());
+				log.debug(":: mainProductsMap.size(): " + mainProductsMap.size());
+				log.debug(":: attributeProductsMap.size(): " + attributeProductsMap.size());
+				log.debug(":: realProductsMap.size(): " + realProductsMap.size());
 				break;
-				
 
 		}
 	}
@@ -131,10 +143,8 @@ public class PrestaMySqlParser
 				mainProductsMap.put(product.getProductId(), product);
 				
 				product.setCode(resultSet.getString("reference"));
-				
 				product.setVisibility(resultSet.getString("visibility"));
 				product.setName(psProductLangNameMap.get(product.getProductId()));
-				
 				product.setLinkRewrite(psProductLangLinkRewriteNameMap.get(product.getProductId()));
 				
 				String urlIdPart =  product.getProductId() + "-" +  product.getLinkRewrite(); // default in PresstaShop
@@ -144,7 +154,7 @@ public class PrestaMySqlParser
 				// use supplier name as id (in presta db id_supplier is integer)
 				product.setSupplierId(psSupplierMap.get(resultSet.getInt("id_supplier")));
 				
-//				product.setVatPercent(psTaxMap.get(resultSet.getInt("id_tax_rules_group")));
+				// product.setVatPercent(psTaxMap.get(resultSet.getInt("id_tax_rules_group"))); // TOFIX null exception
 				
 				product.setWholesaleNettoPrice(resultSet.getDouble("wholesale_price"));
 				product.setNettoPrice(resultSet.getDouble("price"));
@@ -157,7 +167,7 @@ public class PrestaMySqlParser
 				
 			}
 			
-			System.out.println("--- main products num: " + mainProductsMap.size());
+			log.debug("--- main products num: " + mainProductsMap.size());
 			
 		} catch (SQLException e) {
 			e.printStackTrace();
@@ -185,13 +195,12 @@ public class PrestaMySqlParser
 				if (mainProduct == null)
 				{
 					
-					System.out.println("Can't find main product for productId: " + product.getProductId() 
+					log.debug("Can't find main product for productId: " + product.getProductId() 
 										+ " | attributeProductId: " + product.getAttributeProductId());
 					continue;
 				}
 				mainProduct.setHasChildren(true);
 				
-				// TODO check option with constructor PrestaProduct(PrestaProduct mainProduct)
 				// copy properties from main product
 				product.setVisibility(mainProduct.getVisibility());
 				product.setName(mainProduct.getName());
@@ -202,9 +211,7 @@ public class PrestaMySqlParser
 				product.setDateAdd(mainProduct.getDateAdd());
 				product.setDateUpdate(mainProduct.getDateUpdate());
 				
-				
 				product.setCode(resultSet.getString("reference"));
-				
 				product.setWholesaleNettoPrice(resultSet.getDouble("wholesale_price"));
 				product.setNettoPrice(resultSet.getDouble("price"));
 				
@@ -213,13 +220,12 @@ public class PrestaMySqlParser
 				
 				if (psProductAttributeCombinationMap.get(product.getAttributeProductId()) == null)
 				{
-					System.out.println("NULL FOR attributeProductId: " + product.getAttributeProductId());
+					log.debug("NULL FOR attributeProductId: " + product.getAttributeProductId());
 					continue;
 				}
 				
 				product.setAttributeId(psProductAttributeCombinationMap.get(product.getAttributeProductId()));
 				product.setAttributeName(psAttributeLangMap.get(product.getAttributeId()));
-				
 				
 				int attributeGroupIdValue = psAttributeMap.get(product.getAttributeId());
 				String attrUrlName = psLayeredIndexableAttributeGroupLangValueMap.get(attributeGroupIdValue);
@@ -240,8 +246,6 @@ public class PrestaMySqlParser
 	
 	private void validateCodesAndSetupRealProductsMap(Shop shop) 
 	{
-
-
 		// Main products with children should have empty code and hasChildren
 		// property is set on the basis of attribute products data
 		List<String> allCodesList = new ArrayList<>();
@@ -249,7 +253,6 @@ public class PrestaMySqlParser
 
 		for (PrestaProduct mainProduct : mainProductsMap.values()) 
 		{
-
 			// add to real products only independent main products with code (enabled to buy)
 			if (!mainProduct.isHasChildren()) 
 			{
@@ -260,12 +263,10 @@ public class PrestaMySqlParser
 			} else {
 				if (!mainProduct.getCode().equals("") && mainProduct.getCode() != null) 
 				{
-					System.out.println("Main product with children and id: " + mainProduct.getProductId() + " should has no code ");
+					log.debug("Main product with children and id: " + mainProduct.getProductId() + " should has no code ");
 				}
 			}
-
 		}
-		
 
 		for (PrestaProduct attrProduct : attributeProductsMap.values()) 
 		{
@@ -273,7 +274,6 @@ public class PrestaMySqlParser
 			if (!validateProductCode(attrProduct.getCode(), allCodesList, duplicateCodesList)) continue;
 			realProductsMap.put(attrProduct.getCode(), attrProduct);
 		}
-		
 		
 		for (String duplicateCode : duplicateCodesList)
 		{
@@ -301,7 +301,6 @@ public class PrestaMySqlParser
 	}
 	
 	
-	
 	// ::: IMAGES :::
 	
 	private void setupMainProductImages(Shop shop) 
@@ -314,7 +313,7 @@ public class PrestaMySqlParser
 		for (Map.Entry<Integer, Integer> entry : psImageMap.entrySet())
 		{
 			PrestaProduct product = mainProductsMap.get(entry.getValue());
-			// ***************** COMMENT > USE MAIN PRODUCT FOR SEO SITE
+			// don't add all photos to main with children
 			if (product == null || product.isHasChildren()) continue;
 			String imgUrl = shop.getBaseUrl() + "/" + entry.getKey() + PHOTO_SIZE + "/" + product.getLinkRewrite() + ".jpg";
 			PrestaProductImage prestaProductImage = new PrestaProductImage();
@@ -331,10 +330,10 @@ public class PrestaMySqlParser
 			product.setPrestaProductImageSet(new HashSet<>());
 		}
 		
-		System.out.println(":: psProductAttributeImageList.size(): " + psProductAttributeImageList.size());
+		log.debug(":: psProductAttributeImageList.size(): " + psProductAttributeImageList.size());
 		int nullCounter = 0;
 		// List instead Map used because id_image in ps_product_attribute_image table is not unique 
-		// (in ps_image table is unique)
+		// (in ps_image table id_image is unique)
 		for (int i = 0; i < psProductAttributeImageList.size(); i++) 
 		{
 			int attrProductId = psProductAttributeImageList.get(i)[0];
@@ -350,7 +349,7 @@ public class PrestaMySqlParser
 			prestaProductImage.setUrl(imgUrl);
 			product.getPrestaProductImageSet().add(prestaProductImage);
 		}
-		System.out.println(":: nullCounter: " + nullCounter);
+		log.debug(":: nullCounter: " + nullCounter);
 		
 	}
 	

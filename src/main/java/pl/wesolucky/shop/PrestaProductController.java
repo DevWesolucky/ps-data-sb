@@ -44,7 +44,7 @@ public class PrestaProductController
 	
 	
 	/**
-	 * Get selected product from selected shop.
+	 * Gets selected product from selected shop.
 	 * 
 	 * @param shopId The id of selected shop.
 	 * @param id The id of selected product.
@@ -75,7 +75,7 @@ public class PrestaProductController
 	}
 	
 	/**
-	 * Get all products from data base of application.
+	 * Gets all products from data base of application (local H2).
 	 * 
 	 * @param id The id of selected shop
 	 * @return List<PrestaProduct>
@@ -92,8 +92,8 @@ public class PrestaProductController
     
     
     /**
-     * Get all products data from MySQL and check all products exist
-     * in data base of application. If not save.
+     * Gets all products data from MySQL and checks all products exist
+     * in data base of application (H2). If not save.
      * 
      * @param id The id of selected shop
      * @return List<PrestaProduct>
@@ -122,7 +122,6 @@ public class PrestaProductController
     	// get all saved products to check a product already exists in H2 data base
     	List<PrestaProduct> archPrestaProductList = prestaProductRepository.findByShopId(shop.getId());
     	
-    	
     	for (int i = 0; i < shop.getMySqlProductsList().size(); i++)
     	{
     		PrestaProduct pProduct = shop.getMySqlProductsList().get(i);
@@ -135,7 +134,7 @@ public class PrestaProductController
     			prestaProductRepository.save(pProduct);
     			if (pProduct.getPrestaProductImageSet() == null)
     			{
-    				System.out.println("NULL image set for productId: " + pProduct.getProductId() 
+    				log.debug("NULL image set for productId: " + pProduct.getProductId() 
     									+ " and attributeProductId: " + pProduct.getAttributeProductId());
     				continue;
     			}
@@ -153,10 +152,9 @@ public class PrestaProductController
     		}
     	}
     	
-    	
     	watch.stop();
-    	System.out.println("newProductCounter: " + newProductCounter + " | newImageCounter: " + newImageCounter);
-    	System.out.println(watch.prettyPrint());
+    	log.debug("newProductCounter: " + newProductCounter + " | newImageCounter: " + newImageCounter);
+    	log.debug(watch.prettyPrint());
     	
     	List<PrestaProduct> productsList = prestaProductRepository.findByShopId(id);
     	return new ResponseEntity<Object>(productsList, HttpStatus.OK);
@@ -165,7 +163,7 @@ public class PrestaProductController
 
 	private boolean isProductExistsInH2Db(PrestaProduct pProduct, List<PrestaProduct> archPrestaProductList) 
 	{
-		// unique product should has unique values for productId and attributeProductId
+		// unique product should has unique values pair for productId and attributeProductId
     	List<PrestaProduct> checkList = archPrestaProductList.stream()
 			.filter(p -> p.getProductId() == pProduct.getProductId() && p.getAttributeProductId() == pProduct.getAttributeProductId())
 			.collect(Collectors.toList());

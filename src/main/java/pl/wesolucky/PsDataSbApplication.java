@@ -1,5 +1,7 @@
 package pl.wesolucky;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -7,10 +9,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class PsDataSbApplication 
 {
 
+	static Logger log = LoggerFactory.getLogger(PsDataSbApplication.class);
+	
 	public static void main(String[] args) 
 	{
 		SpringApplication.run(PsDataSbApplication.class, args);
-		System.out.println("--- startup completed ---");
+		log.info("\n--- startup completed ---");
 	}
 	
 	

@@ -6,9 +6,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import pl.wesolucky.shop.domain.Shop;
 
@@ -20,61 +23,110 @@ public class PrestaMySqlDAO
 	private Statement statement;
 	private ResultSet resultSet;
 	
-	private String processStatus;
 	private String errorMsg;
-	
-	private PrestaMySqlParser prestaMySqlParser;
-	
+	private final PrestaMySqlParser prestaMySqlParser = new PrestaMySqlParser();
 	private Map<String, String[]> tablesMap;
-	List<String> startupTableList;
 	
+	private final Logger log = LoggerFactory.getLogger(PrestaMySqlDAO.class);
 	
 	public PrestaMySqlDAO()
 	{
-		prestaMySqlParser = new PrestaMySqlParser();
-		setupProductTablesMap();
+		setupProductTablesMap(); // setup custom tables and fields
 	}
 	
 
+	/**
+	 * Reads PrestaShop product data from custom tables and fields.
+	 * 
+	 * @param shop The shop to get data from
+	 */
 	public void readAllPrestaProductData(Shop shop) 
 	{
-		System.out.println("\n--- PrestaMySqlDAO.readAllPrestaProductData for: " + shop.getId() + " ...");
+		log.debug("\n--- PrestaMySqlDAO.readAllPrestaProductData for: " + shop.getId() + " ...");
 		
 		errorMsg = "";
 		long startTime = System.currentTimeMillis();
 		
-		
 		connection = getConnection(shop);
-		System.out.println("PrestaMySqlDAO.readAllPrestaProductData > connection: " + connection);
+		log.debug("PrestaMySqlDAO.readAllPrestaProductData > connection: " + connection);
 		statement = null;
 		
-		prestaMySqlParser.initCollections(shop);
+		prestaMySqlParser.resetCollections(shop);
 		
 		try {
 			statement = connection.createStatement();
-
-			for (String table : startupTableList)
+			
+			// iterate through all custom tables and gets data from custom columns
+			for (String table : tablesMap.keySet())
 			{
-				System.out.println("::: table: " + table);
+				log.debug("::: table: " + table);
 				String[] columnsArr = tablesMap.get(table);
 				String sql = "SELECT " + String.join(",", columnsArr) + " FROM " + table;
-				System.out.println("sql: " + sql);
+				log.debug("sql: " + sql);
 				resultSet = statement.executeQuery(sql);
+				// parse results for current table
 				prestaMySqlParser.parseResultSetForTable(resultSet, table, shop);
 				resultSet.close();
 			}
 		} catch (SQLException e) 
 		{
 			errorMsg = e.getMessage();
-			System.out.println("\n" + "PrestaMySqlDAO.readAllPrestaProductStartupData SQLException ");
-			System.out.println(errorMsg);
+			log.debug("\n" + "PrestaMySqlDAO.readAllPrestaProductStartupData SQLException ");
+			log.debug(errorMsg);
 		}
 		
 		closeConnection();
 		
 		double processTime = (System.currentTimeMillis() - startTime) * 0.001;
-		System.out.println("TOTAL read and parse time: " + processTime);
+		log.debug("TOTAL read and parse time: " + processTime);
 		
+	}
+	
+	/**
+	 * Checks connection by connect to data base and gets list of tables
+	 * 
+	 * @param shop The shop to check connections
+	 * @return errorMsg Empty string if success or error message
+	 */
+	public String checkTables(Shop shop)
+	{
+		log.debug("\n--- PrestaMySqlDAO.showTables for: " + shop.getId() + " ...");
+		
+		errorMsg = "";
+		long startTime = System.currentTimeMillis();
+		
+		connection = getConnection(shop);
+		if (!errorMsg.equals("")) return errorMsg;
+		
+		statement = null;
+		
+		try {
+			statement = connection.createStatement();
+
+			String sql = "show tables";
+			resultSet = statement.executeQuery(sql);
+			
+			List <String> tablesList = new ArrayList<>();
+			while (resultSet.next())
+			{
+				tablesList.add(resultSet.getString(1));
+			}
+			log.debug("tablesList.size(): " + tablesList.size());
+			resultSet.close();
+			// wrong data base > TODO get more specific data e.g. PrestaShop version
+			if (!tablesList.contains("ps_product")) errorMsg = "Can't find ps_product table.";
+		} catch (SQLException e) 
+		{
+			errorMsg = e.getMessage();
+			log.debug("\n  SQLException " + errorMsg);
+		}
+		
+		closeConnection();
+		
+		double processTime = (System.currentTimeMillis() - startTime) * 0.001;
+		log.debug("TOTAL read and parse time: " + processTime);
+		
+		return errorMsg;
 	}
 	
 	
@@ -83,7 +135,7 @@ public class PrestaMySqlDAO
 	private Connection getConnection(Shop shop)
 	{
 		String dbUrl = "jdbc:mysql://" + shop.getHost() + ":" + shop.getPort() + "/" + shop.getDbName();
-		System.out.println("PrestaMySqlDAO.getConnection for database: " + dbUrl + "...");
+		log.debug("PrestaMySqlDAO.getConnection for database: " + dbUrl + "...");
 		double startProcessTime = System.currentTimeMillis();
 		
 	    connection = null;
@@ -103,9 +155,9 @@ public class PrestaMySqlDAO
 			}
 		}
 	    
-	    if (!errorMsg.equals("")) System.out.println("PrestaMySqlDAO.getConnection ERROR: " + errorMsg);
+	    if (!errorMsg.equals("")) log.debug("PrestaMySqlDAO.getConnection ERROR: " + errorMsg);
 	    double processTime = (System.currentTimeMillis() - startProcessTime) * 0.001;
-		System.out.println("Connecting time: " + processTime);
+		log.debug("Connecting time: " + processTime);
 		
 	    return connection;
 	}
@@ -125,77 +177,49 @@ public class PrestaMySqlDAO
 	private void setupProductTablesMap()
 	{
 		// map with table name as key, and column names array as value
-		tablesMap = new HashMap<String, String[]>();
+		// data order has matter for parse process > first properties > main products 
+		// > attribute products > availability > setup real products
+		tablesMap = new LinkedHashMap<String, String[]>();
 		String[] fieldsArr;
 		
-		// for startup data order has matter > first properties > main products > attribute products 
-		// > availability > setup real products
-		startupTableList = new ArrayList<>();
 		
 		fieldsArr = new String[] {"id_product", "name", "link_rewrite"};
 		tablesMap.put("ps_product_lang", fieldsArr);
-		startupTableList.add("ps_product_lang");
 		
 		fieldsArr = new String[] {"id_supplier", "name"};
 		tablesMap.put("ps_supplier", fieldsArr);
-		startupTableList.add("ps_supplier");
 		
 		fieldsArr = new String[] {"id_tax", "rate"};
 		tablesMap.put("ps_tax", fieldsArr);
-		startupTableList.add("ps_tax");
 		
 		fieldsArr = new String[] {"id_attribute", "id_attribute_group"};
 		tablesMap.put("ps_attribute", fieldsArr);
-		startupTableList.add("ps_attribute");
 		
 		fieldsArr = new String[] {"id_attribute", "name"};
 		tablesMap.put("ps_attribute_lang", fieldsArr);
-		startupTableList.add("ps_attribute_lang");
 		
 		fieldsArr = new String[] {"id_product_attribute", "id_attribute"};
 		tablesMap.put("ps_product_attribute_combination", fieldsArr);
-		startupTableList.add("ps_product_attribute_combination");
 		
 		fieldsArr = new String[] {"id_attribute_group", "url_name"};
 		tablesMap.put("ps_layered_indexable_attribute_group_lang_value", fieldsArr);
-		startupTableList.add("ps_layered_indexable_attribute_group_lang_value");
-		
 		
 		fieldsArr = new String[] {"id_image", "id_product_attribute"};
 		tablesMap.put("ps_product_attribute_image", fieldsArr);
-		startupTableList.add("ps_product_attribute_image");
 		
 		fieldsArr = new String[] {"id_image", "id_product"};
 		tablesMap.put("ps_image", fieldsArr);
-		startupTableList.add("ps_image");
-		
 		
 		fieldsArr = new String[] {"id_product", "reference", "id_category_default", "id_supplier", "id_tax_rules_group", 
 				"visibility", "wholesale_price", "price", "ean13", "weight", "date_upd", "date_add"};
 		tablesMap.put("ps_product", fieldsArr);
-		startupTableList.add("ps_product");
 		
 		fieldsArr = new String[] {"id_product", "id_product_attribute", "reference", "wholesale_price", "price", 
 				"ean13", "weight", "default_on"};
 		tablesMap.put("ps_product_attribute", fieldsArr);
-		startupTableList.add("ps_product_attribute");
-		
 		
 		fieldsArr = new String[] {"id_product", "id_product_attribute", "quantity"};
 		tablesMap.put("ps_stock_available", fieldsArr);
-		startupTableList.add("ps_stock_available");
-	}
-	
-
-
-	public String getProcessStatus() 
-	{
-		return processStatus;
-	}
-
-	public String getErrorMsg() 
-	{
-		return errorMsg;
 	}
 	
 
