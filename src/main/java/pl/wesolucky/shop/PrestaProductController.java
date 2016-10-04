@@ -44,26 +44,19 @@ public class PrestaProductController
 	
 	
 	/**
-	 * Gets selected product from selected shop.
+	 * Gets selected product by id from default source (H2 data base).
 	 * 
-	 * @param shopId The id of selected shop.
 	 * @param id The id of selected product.
 	 * @return ResponseEntity with PrestaProduct in body, 
 	 * or ResponseEntity with bed request status and failure message
 	 */
-    @RequestMapping(value = "shop/{shopId}/product/{id}", 
+    @RequestMapping(value = "products/default/{id}", 
 			method = RequestMethod.GET, 
 			produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<Object> getProductByShopIdAndProductId(@PathVariable Long shopId, @PathVariable Long id)
+	public ResponseEntity<Object> getDefaultProductById(@PathVariable Long id)
 	{
         String failureMsg = "";
-    	Shop shop = shopRepository.findOne(shopId);
-    	if (shop == null)
-    	{
-        	failureMsg = "Cannot find shop with id: " + shopId;
-            return new ResponseEntity<Object>(new FailureMessage(failureMsg), HttpStatus.BAD_REQUEST);
-    	}
-    	
+
     	PrestaProduct product = prestaProductRepository.findOne(id);
     	if (product == null)
     	{
@@ -75,15 +68,15 @@ public class PrestaProductController
 	}
 	
 	/**
-	 * Gets all products from data base of application (local H2).
+	 * Gets all selected shop products from default source (H2 data base).
 	 * 
 	 * @param id The id of selected shop
 	 * @return List<PrestaProduct>
 	 */
-    @RequestMapping(value = "shops/products/h2/{id}", 
+    @RequestMapping(value = "products/default/shop/{id}", 
 			method = RequestMethod.GET, 
 			produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Object> getShopH2Products(@PathVariable Long id)
+    public ResponseEntity<Object> getDefaultProductsByShopId(@PathVariable Long id)
     {
     	log.info("REST request to get products from H2 data base : {}", id);
     	List<PrestaProduct> productsList = prestaProductRepository.findByShopId(id);
@@ -98,10 +91,10 @@ public class PrestaProductController
      * @param id The id of selected shop
      * @return List<PrestaProduct>
      */
-    @RequestMapping(value = "shops/products/presta/{id}", 
+    @RequestMapping(value = "products/presta/shop/{id}", 
     				method = RequestMethod.GET, 
     				produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Object> getShopMySqlProducts(@PathVariable Long id)
+    public ResponseEntity<Object> getPrestaProductsByShopId(@PathVariable Long id)
     {
     	log.info("REST request to get products from MySQL and save them in H2 data base : {}", id);
     	
